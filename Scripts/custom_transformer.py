@@ -2,9 +2,13 @@
 
 from sklearn.base import BaseEstimator, TransformerMixin
 import re
+from nltk.tokenize import word_tokenize
+from nltk.stem.isri import ISRIStemmer
+from arabic_reshaper import reshape
 from nltk.corpus import stopwords
 
 stopwords_arabic = set(stopwords.words('arabic'))
+
 
 class CustomTransformer(BaseEstimator, TransformerMixin):
     def __init__(self):
@@ -20,18 +24,46 @@ class CustomTransformer(BaseEstimator, TransformerMixin):
 
     @staticmethod
     def clean_arabic_text(text):
-        # Remove non-Arabic characters
-        arabic_text = re.sub(r'[^\u0600-\u06FF\s]+', '', text)
+        # Define Arabic stopwords
+        stopwords_arabic = set(stopwords.words('arabic'))
         
-        # Remove URLs and mentions
-        arabic_text = re.sub(r'http\S+|@\w+', '', arabic_text)
+        # Remove mentions
+        text = re.sub(r'@\w+', '', text)
+        # Remove hashtags
+        text = re.sub(r'#\w+', '', text)
+        # Remove URLs
+        text = re.sub(r'http\S+|www\S+|https\S+', '', text, flags=re.MULTILINE)
+        # Remove punctuation and numbers
+        text = re.sub(r'\d+', '', text)
+        text = re.sub(r'[^\w\s]', '', text)
+        # Remove extra whitespace
+        text = text.strip()
+        text = re.sub(r'\s+', ' ', text)
+        # Convert to lowercase
+        text = text.lower()
         
-        # Remove Arabic stopwords
-        arabic_text = ' '.join(word for word in arabic_text.split() if word not in stopwords_arabic)
+        # Convert to Arabic script
+        text = reshape(text)
+        # Remove diacritics
+        text = re.sub(r'[\u0617-\u061A\u064B-\u0652]', '', text)
+        # Normalize Arabic letters
+        text = re.sub("[إأآا]", "ا", text)
+        text = re.sub("ى", "ي", text)
+        text = re.sub("ؤ", "ء", text)
+        text = re.sub("ئ", "ء", text)
+        text = re.sub("ة", "ه", text)
         
-        # Optionally, remove additional characters or patterns specific to your use case
+        # Tokenization
+        tokens = word_tokenize(text)
         
-        return arabic_text.strip()
+        # Remove stopwords
+        tokens = [word for word in tokens if word not in stopwords_arabic]
+        
+        # Stemming
+        stemmer = ISRIStemmer()
+        tokens = [stemmer.stem(token) for token in tokens]
+        
+        return ' '.join(tokens)
 
     def fit_transform(self, X, y=None):
         self.fit(X, y)
